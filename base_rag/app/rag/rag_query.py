@@ -39,30 +39,29 @@ chat = RunnableWithMessageHistory(
 async def hybrid_search(question: str, user_id: int, top_k: int = 20) -> list[dict]:
     collection_name = user_collection_name(user_id=user_id)
 
-    exists = qdrant_client.collection_exists(collection_name=collection_name)
+    exists = await qdrant_client.collection_exists(collection_name=collection_name)
     if not exists:
         logger.info("Пользователь запросил ответ но в его истории нет никаких документов.")
         return []
     
     dense_vector = embedding_model_bge_m3.embed_query(question)
-    sparse_vector = list(bm25_model_qdrantmb25.embe([question]))[0]
+    sparse_vector = list(bm25_model_qdrantmb25.embed([question]))[0]
 
     results = await qdrant_client.query_points(
         collection_name=collection_name,
         prefetch=[
             Prefetch(
-                query=NamedVector(name="dense", vector=dense_vector),
+                query=dense_vector,
+                using="dense",
                 limit=top_k,
             ),
             Prefetch(
-                query=NamedSparseVector(
-                    name="sparse",
-                    vector=SparseVector(
+                query=SparseVector(
                         indices=sparse_vector.indices.tolist(),
                         values=sparse_vector.values.tolist(),
                     ),
-                ),
-                limit=top_k,
+                    using="sparse",
+                    limit=top_k
             ),
         ],
         query=FusionQuery(fusion=Fusion.RRF),
@@ -85,7 +84,7 @@ async def rerank(question: str, candidates: list[dict], top_k: int = 5) -> list[
         return ["У пользователя пока нет никаких добавленных источников"]
     
     pairs = [(question, candidate["text"]) for candidate in candidates]
-    scores = reranker_bge_v2_m3(pairs)
+    scores = reranker_bge_v2_m3.score(pairs)
 
     for candidate, score in zip(candidates, scores):
         candidate["reranker_score"] = float(score)
@@ -98,7 +97,7 @@ async def rag_answer(question: str, session_id: str, user_id: int) -> StreamingR
     logger.debug("Получен запрос на ответ запускаю пайплайн.")
     try:
         candidates = await hybrid_search(question=question, user_id=user_id)
-        logger.info(f"Получена кандидатов: {len(candidates)}")
+        logger.info(f"Получено кандидатов: {len(candidates)}")
 
         if not candidates:
             async def no_data_stream():
@@ -106,8 +105,8 @@ async def rag_answer(question: str, session_id: str, user_id: int) -> StreamingR
                 yield "data [DONE]\n\n"
             return StreamingResponse(no_data_stream(), media_type="text/event-stream")
         
-        top_docs = rerank(question=question, candidates=candidates, top_k=5)
-        logger.debug(f"После Rerank топ 1 score = {top_docs["reranker_score"]:3f}")
+        top_docs = await rerank(question=question, candidates=candidates, top_k=5)
+        logger.debug(f"После Rerank топ 1 score = {top_docs[0]["reranker_score"]:3f}")
 
         context = "\n\n---\n\n".join(f"Источник: {doc["source"]}\n\n {doc["text"]}" for doc in top_docs)
 

@@ -1,11 +1,9 @@
-from passlib.context import CryptContext
 from jose import jwt
+import bcrypt
 from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer
 from app.auth.config import SECRET_TOKEN
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 security = HTTPBearer()
 
@@ -13,11 +11,11 @@ class UserFuncs:
 
     @staticmethod
     def hash_password(password: str) -> str:
-        return pwd_context.hash(password)
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        return pwd_context.verify(plain_password, hashed_password)
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
     
     @staticmethod
     def create_token(user_id: int) -> str:

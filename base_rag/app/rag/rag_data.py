@@ -59,7 +59,7 @@ async def web_extract(web_url: str) -> dict:
             html = response.text
             logger.info("Данные успешно скачаны, пробую достать текст из них..")
         
-        result_text = trafilatura.extract(
+        result_text = trafilatura.bare_extraction(
             filecontent=html,
             url=web_url,
             include_comments=False,
@@ -75,6 +75,8 @@ async def web_extract(web_url: str) -> dict:
             target_language='ru',
         )
         logger.info("Текст из html успешно получен!")
+
+        result_text = result_text.as_dict()
 
         if not result_text or not result_text.get("text"):
             logger.error(f"Извлеченный текст оказался пустым из {web_url}.")
@@ -97,15 +99,15 @@ async def delete_dublicate_source(user_id: int, source_url: str) -> None:
 
     try:
             
-        colletion_name = user_collection_name(user_id=user_id)
+        collection_name = user_collection_name(user_id=user_id)
 
-        exists = await qdrant_client.collection_exists(colletion_name)
+        exists = await qdrant_client.collection_exists(collection_name)
         if not exists:
             logger.debug("Коллекции у пользователя не было вообще, удалять нечего.")
             return
         
         result = await qdrant_client.delete(
-            colletion_name = colletion_name,
+            collection_name = collection_name,
             points_selector = Filter(
                 must=[
                     FieldCondition(

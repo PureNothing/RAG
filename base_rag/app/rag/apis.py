@@ -12,7 +12,7 @@ async def lifespawn(router):
     logger.info("Запускаю RAG сервис")
     try:
         logger.info("Инициализирую векторное хранилище и модель..")
-        from base_rag.app.rag.config import qdrant_client, embedding_model_bge_m3, llm, bm25_model_qdrantmb25, tokenizer_bge_m3
+        from app.rag.config import qdrant_client, embedding_model_bge_m3, llm, bm25_model_qdrantmb25, tokenizer_bge_m3
         logger.info("Векторное хранилище и модель инициализированы.")
         yield
     except Exception as e:
@@ -34,7 +34,7 @@ async def upload_url(web_url: str, user_id: int = Depends(UserFuncs.get_current_
     try:
         await chunk_and_embed(text=content, user_id=user_id)
         logger.debug("Чанкинг и эмбеддинг успешно завершены.")
-        return JSONResponse(status_code=200,content={"message": "Конент успешно прошел есь пайплайн."})
+        return JSONResponse(status_code=200,content={"message": "Конент успешно прошел есь пайплайн. Пробуйте задать вопрос."})
     except Exception as e:
         logger.error(f"Ошибка при чанкинге и эмбеддинге: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка при чанкинге и эмбеддинге: {e}")

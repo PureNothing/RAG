@@ -50,7 +50,7 @@ class BDfuncs:
         
     @staticmethod
     async def login_user(username: str, password: str) -> str:
-        logger.info("Кто-то пытается войти в систему.")
+        logger.info(f"Кто-то пытается войти в систему под именем - {username}.")
         async with async_session() as session:
             try:
 

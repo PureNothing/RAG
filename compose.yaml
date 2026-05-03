@@ -1,7 +1,7 @@
 volumes:
-  redis_data
-  sql_data
-  qdrant_data
+  redis_data:
+  sql_data:
+  qdrant_data:
 
 networks:
   dbnet:
@@ -10,12 +10,14 @@ networks:
 
 services:
   redis:
-    image: "redis:7-alpine"
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    image: "redis/redis-stack-server:latest"
+    container_name: redis
     volumes:
       - redis_data:/data
     networks:
       - dbnet
+    environment:
+      - REDIS_ARGS=--appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     ports:
       - "127.0.0.1:6379:6379"
     restart: unless-stopped

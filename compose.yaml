@@ -1,0 +1,51 @@
+volumes:
+  redis_data
+  sql_data
+  qdrant_data
+
+networks:
+  dbnet:
+    driver: bridge
+  
+
+services:
+  redis:
+    image: "redis:7-alpine"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - dbnet
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    env_file:
+      - .env
+    volumes:
+      - sql_data:/var/lib/postgresql/data
+    networks:
+      - dbnet
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    mem_limit: 512mb
+    cpus: '0.5'
+    shm_size: 128M
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - qdrant_data:/qdrant/storage
+    env_file:
+      - .env
+    networks:
+      - dbnet
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    restart: unless-stopped
+    mem_limit: 1gb

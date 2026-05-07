@@ -1,13 +1,19 @@
-from dotenv import load_dotenv
-import os
-load_dotenv()
+from pydantic_settings import BaseSettings
 
-SECRET_TOKEN = os.getenv("SECRET_TOKEN")
+class Settings(BaseSettings):
+    SECRET_TOKEN: str
 
-class DB:
-    POSTGRES_USER = os.getenv("POSTGRES_USER")
-    POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-    POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-    POSTGRES_PORT = os.getenv("POSTGRES_PORT")
-    POSTGRES_DB = os.getenv("POSTGRES_DB")
-    POSTGRES_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_HOST: str
+    POSTGRES_PORT: int
+    POSTGRES_DB: str
+
+    @property
+    def POSTGRES_URL(self)-> str:
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    
+    class Config:
+        env_file = ".env"
+
+settings = Settings()

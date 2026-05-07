@@ -63,7 +63,11 @@ class BDfuncs:
                     raise ValueError("Не верное имя пользователя или пароль.")
                 
                 logger.info("Вход успешный, выдаю токен.")
-                return UserFuncs.create_token(result.id)
+                return {
+                    "access_token" :UserFuncs.create_token(result.id),
+                    "refresh_token": UserFuncs.create_refresh_token(result.id)
+                    }
+            
             except Exception as e:
                 logger.error(f"Не удалось залогинить пользователя или выдать токен. {e}")
                 await session.rollback()

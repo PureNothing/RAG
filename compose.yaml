@@ -9,6 +9,31 @@ networks:
   
 
 services:
+
+  app:
+    build: .
+    container_name: app
+    env_file:
+      - ./base_rag/.env
+    networks:
+      - dbnet
+    restart: unless-stopped
+    expose:
+      - "8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8005/docs || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
   redis:
     image: "redis/redis-stack-server:latest"
     container_name: redis
@@ -18,9 +43,13 @@ services:
       - dbnet
     environment:
       - REDIS_ARGS=--appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
-    ports:
-      - "127.0.0.1:6379:6379"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   postgres:
     image: postgres:15
@@ -31,12 +60,16 @@ services:
       - sql_data:/var/lib/postgresql/data
     networks:
       - dbnet
-    ports:
-      - "127.0.0.1:5432:5432"
     restart: unless-stopped
     mem_limit: 512mb
     cpus: '0.5'
     shm_size: 128M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -46,8 +79,33 @@ services:
       - .env
     networks:
       - dbnet
-    ports:
-      - "127.0.0.1:6333:6333"
-      - "127.0.0.1:6334:6334"
     restart: unless-stopped
     mem_limit: 1gb
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "127.0.0.1:80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./logs/nginx:/var/log/nginx
+    networks:
+      - dbnet
+    depends_on:
+      app: 
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

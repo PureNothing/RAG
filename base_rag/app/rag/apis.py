@@ -1,32 +1,27 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from app.rag.rag_data import web_extract, chunk_and_embed
+from app.rag.rag_data import chunk_and_embed
+from app.rag.loaders.web_loader_rag import web_extract
 from app.rag.rag_query import rag_answer
 from app.auth.authfuncs import UserFuncs
 from app.logger import logger
+from app.rag.apischemas import Url, Question
+from app.rag.funcs import check_url
 
-@asynccontextmanager
-async def lifespawn(router):
-    logger.debug("="*30)
-    logger.info("Запускаю RAG сервис")
-    try:
-        logger.info("Инициализирую векторное хранилище и модель..")
-        from app.rag.config import qdrant_client, embedding_model_bge_m3, llm, bm25_model_qdrantmb25, tokenizer_bge_m3
-        logger.info("Векторное хранилище и модель инициализированы.")
-        yield
-    except Exception as e:
-        logger.error(f"Ошибка при инициализации: {e}")
-        raise
-
-router = APIRouter(lifespan=lifespawn)
+router = APIRouter()
 
 @router.post("/upload_url")
-async def upload_url(web_url: str, user_id: int = Depends(UserFuncs.get_current_user)):
+async def upload_url(web_url: Url, user_id: int = Depends(UserFuncs.get_current_user)):
     logger.debug(f"Получен url для индексации.")
     try:
+        check_url(url=web_url.url)
+    except Exception as e:
+        logger.warning(f"Прислали недопстимый url. {e}")
+        raise HTTPException(status_code=400, detail="Недопустимый url.")
+    try:
         logger.debug("Начинаю индексацию url...")
-        content= await web_extract(web_url=web_url)
+        content= await web_extract(web_url=web_url.url)
         logger.debug("Конент извлечен, начинаю процесс чанкинга и эмбеддинга...")
     except Exception as e:
         logger.error(f"Ошибка при изввлечении контента: {e}")
@@ -40,11 +35,11 @@ async def upload_url(web_url: str, user_id: int = Depends(UserFuncs.get_current_
         raise HTTPException(status_code=500, detail=f"Ошибка при чанкинге и эмбеддинге: {e}")
     
 @router.post("/rag_answer")
-async def rag_answer_get(question: str, user_id: int = Depends(UserFuncs.get_current_user)):
-    logger.debug(f"Получен вопрос для RAG: {question}")
+async def rag_answer_get(question: Question, user_id: int = Depends(UserFuncs.get_current_user)):
+    logger.debug(f"Получен вопрос для RAG: {question.question}")
     try:
         logger.debug("Начинаю процесс ответа..")
-        answer = await rag_answer(question=question, session_id=str(user_id), user_id=int(user_id))
+        answer = await rag_answer(question=question.question, session_id=str(user_id), user_id=int(user_id))
         logger.debug("Ответ успешно получен.")
         return answer
     except Exception as e:

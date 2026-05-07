@@ -1,20 +1,26 @@
 from langchain_huggingface import HuggingFaceEmbeddings
 from transformers import AutoTokenizer 
-from langchain.chat_models import init_chat_model
-from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
 from qdrant_client import AsyncQdrantClient
 from fastembed import SparseTextEmbedding
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
-import os
+from pydantic_settings import BaseSettings
 
-load_dotenv()
+class Settings(BaseSettings):
+    REDIS_URL: str
+    
+    QDRANT_URL: str
+    QDRANT_API_KEY: str
 
-REDIS_URL = os.getenv("REDIS_URL")
+    GROQ_API_KEY: str
+    OPEN_ROUTER_API_KEY: str
+    POLZAAI_API_KEY: str
 
-QDRANT_URL = os.getenv("QDRANT_URL")
+    class Config:
+        env_file = ".env"
 
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+settings = Settings()
 
 DENSE_SIZE = 1024
 
@@ -34,11 +40,11 @@ reranker_bge_v2_m3 = HuggingFaceCrossEncoder(
     model_kwargs={"device": "cpu"}
 )
 
-llm = init_chat_model(
-    model="openai/gpt-oss-120b",
-    model_provider="groq",
+llm = ChatOpenAI(
+    model="openai/gpt-4o-mini",
     temperature=0.3,
-    api_key=os.getenv("GROQ_API_KEY"),
+    api_key=settings.POLZAAI_API_KEY,
+    base_url="https://polza.ai/api/v1"
 )
 
 
@@ -49,9 +55,9 @@ embedding_model_bge_m3 = HuggingFaceEmbeddings(model_name="BAAI/bge-m3",
                                    )
 
 qdrant_client = AsyncQdrantClient(
-    url=QDRANT_URL,
+    url=settings.QDRANT_URL,
     timeout=30,
-    api_key=QDRANT_API_KEY
+    api_key=settings.QDRANT_API_KEY
 )
 
 RAG_PROMPT = """

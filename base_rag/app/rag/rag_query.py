@@ -1,22 +1,11 @@
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_redis import RedisChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from fastapi.responses import StreamingResponse
 from qdrant_client.models import Prefetch, FusionQuery, Fusion, NamedVector, NamedSparseVector, SparseVector
-from app.rag.config import llm, RAG_PROMPT, qdrant_client, reranker_bge_v2_m3, embedding_model_bge_m3, bm25_model_qdrantmb25, REDIS_URL
+from app.rag.config import llm, RAG_PROMPT, qdrant_client, reranker_bge_v2_m3, embedding_model_bge_m3, bm25_model_qdrantmb25, settings
 from app.rag.rag_data import user_collection_name
+from app.rag.funcs import get_session_history, clear_session_history
 from app.logger import logger
-
-def get_session_history(session_id: str) -> RedisChatMessageHistory:
-    return RedisChatMessageHistory(
-        session_id=session_id,
-        redis_url=REDIS_URL,
-        ttl=604800,
-    )
-
-async def clear_session_history(session_id: str) -> None:
-    history = get_session_history(session_id=session_id)
-    history.clear()
 
 prompt = ChatPromptTemplate.from_messages(
     [
@@ -80,8 +69,6 @@ async def hybrid_search(question: str, user_id: int, top_k: int = 20) -> list[di
     ]
 
 async def rerank(question: str, candidates: list[dict], top_k: int = 5) -> list[dict]:
-    if not candidates:
-        return ["У пользователя пока нет никаких добавленных источников"]
     
     pairs = [(question, candidate["text"]) for candidate in candidates]
     scores = reranker_bge_v2_m3.score(pairs)
@@ -129,3 +116,4 @@ async def rag_answer(question: str, session_id: str, user_id: int) -> StreamingR
     
     except Exception as e:
         logger.error(f"Ошибка при попытке получить ответ. {e}")
+        raise

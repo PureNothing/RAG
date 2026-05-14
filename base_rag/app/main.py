@@ -2,6 +2,7 @@ from fastapi import FastAPI
 import app.rag.apis as ragapis
 import app.auth.apis as authapis
 from contextlib import asynccontextmanager
+from prometheus_fastapi_instrumentator import Instrumentator
 from app.logger import logger
 from app.auth.dbfuncs import BDfuncs
 import uvicorn 
@@ -26,6 +27,8 @@ app = FastAPI(lifespan=lifespawn)
 
 app.include_router(ragapis.router)
 app.include_router(authapis.router)
+
+Instrumentator().instrument(app).expose(app)
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", port=8005, reload=False)

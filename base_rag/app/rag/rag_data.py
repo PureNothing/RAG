@@ -2,6 +2,7 @@ import trafilatura
 import httpx
 import uuid
 import re
+from langfuse import observe
 from app.rag.config import qdrant_client, embedding_model_bge_m3, bm25_model_qdrantmb25, chunker_with_bge_m3, DENSE_SIZE
 from app.logger import logger
 from qdrant_client.models import Distance, VectorParams, SparseVectorParams, PointStruct, SparseVector, Modifier, Filter, FieldCondition, MatchValue, UpdateStatus
@@ -78,6 +79,7 @@ async def delete_dublicate_source(user_id: int, source_url: str) -> None:
         logger.error(f"Не удалось удалить дубликат или подключить к БД. {e}")
         raise
 
+@observe()
 async def chunk_and_embed(text: dict, user_id: int) -> int:
     try:
 

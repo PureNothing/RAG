@@ -1,7 +1,9 @@
 import trafilatura
 import httpx
+from langfuse import observe
 from app.logger import logger
 
+@observe()
 async def web_extract(web_url: str) -> dict:
     logger.debug(f"Получена ссылка на извлечение данных {web_url}")
     try:

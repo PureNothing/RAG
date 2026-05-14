@@ -1,7 +1,8 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from fastapi.responses import StreamingResponse
-from qdrant_client.models import Prefetch, FusionQuery, Fusion, NamedVector, NamedSparseVector, SparseVector
+from qdrant_client.models import Prefetch, FusionQuery, Fusion, SparseVector
+from langfuse import observe
 from app.rag.config import llm, RAG_PROMPT, qdrant_client, reranker_bge_v2_m3, embedding_model_bge_m3, bm25_model_qdrantmb25, settings
 from app.rag.rag_data import user_collection_name
 from app.rag.funcs import get_session_history, clear_session_history
@@ -25,6 +26,7 @@ chat = RunnableWithMessageHistory(
     history_messages_key="history"
 )
 
+@observe()
 async def hybrid_search(question: str, user_id: int, top_k: int = 20) -> list[dict]:
     collection_name = user_collection_name(user_id=user_id)
 
@@ -68,6 +70,7 @@ async def hybrid_search(question: str, user_id: int, top_k: int = 20) -> list[di
         for point in results.points
     ]
 
+@observe()
 async def rerank(question: str, candidates: list[dict], top_k: int = 5) -> list[dict]:
     
     pairs = [(question, candidate["text"]) for candidate in candidates]
@@ -80,6 +83,7 @@ async def rerank(question: str, candidates: list[dict], top_k: int = 5) -> list[
 
     return reranked[:top_k]
 
+@observe()
 async def rag_answer(question: str, session_id: str, user_id: int) -> StreamingResponse:
     logger.debug("Получен запрос на ответ запускаю пайплайн.")
     try:
@@ -89,7 +93,7 @@ async def rag_answer(question: str, session_id: str, user_id: int) -> StreamingR
         if not candidates:
             async def no_data_stream():
                 yield "data: У вас нет загруженных документов, загрузите их через /upload_url\n\n"
-                yield "data [DONE]\n\n"
+                yield "data: [DONE]\n\n"
             return StreamingResponse(no_data_stream(), media_type="text/event-stream")
         
         top_docs = await rerank(question=question, candidates=candidates, top_k=5)
@@ -98,15 +102,20 @@ async def rag_answer(question: str, session_id: str, user_id: int) -> StreamingR
         context = "\n\n---\n\n".join(f"Источник: {doc["source"]}\n\n {doc["text"]}" for doc in top_docs)
 
         async def stream_tokens():
-            async for chunk in chat.astream(
-                {"question": question,
-                "context": context},
-                config={"configurable": {"session_id": session_id}}
-            ):
-                if chunk.content:
-                    yield f"data: {chunk.content}\n\n"
-                
-            yield "data: [DONE]\n\n"
+            try:
+                async for chunk in chat.astream(
+                    {"question": question,
+                    "context": context},
+                    config={"configurable": {"session_id": session_id}}
+                ):
+                    if chunk.content:
+                        yield f"data: {chunk.content}\n\n"
+                    
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                logger.error(f"Ошибка при генерации ответа: {e}")
+                yield f"data: Ошикбка при генерации ответа - {e}\n\n"
+                yield "data: [DONE]\n\n"
         
         return StreamingResponse(
             stream_tokens(),

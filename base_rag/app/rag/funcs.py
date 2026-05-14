@@ -1,4 +1,4 @@
-from app.auth.config import settings
+from app.rag.config import settings
 from langchain_redis import RedisChatMessageHistory
 from urllib.parse import urlparse
 import socket
@@ -30,3 +30,5 @@ def get_session_history(session_id: str) -> RedisChatMessageHistory:
 async def clear_session_history(session_id: str) -> None:
     history = get_session_history(session_id=session_id)
     history.clear()
+
+
